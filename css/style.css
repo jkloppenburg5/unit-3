@@ -1,1 +1,19 @@
 /*Add CSS styles here*/
+.axis path,
+.axis line {
+    fill: none;
+    stroke: black;
+    stroke-width: 1px;
+    shape-rendering: crispEdges;
+}
+
+.axis text {
+    font-family: sans-serif;
+    font-size: 0.9em;
+}
+
+.title {
+    font-family: sans-serif;
+    font-size: 1.5em; /*sets the font size to 1.5 times the parent element’s font size. It is a relative unit, making it flexible and scalable for responsive designs.*/
+    font-weight: bold;
+}
