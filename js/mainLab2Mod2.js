@@ -68,7 +68,7 @@ function createMap(csvData, mexicoStates, map, width, height, projection) {
         .attr("class", "graticule") // Set CSS class for styling
         .attr("d", path); // Generate path data using projection
     
-    // 3. Draw all states (middle layer)
+    // 3. LAST draw all states (middle layer)
     map.selectAll(".state") // Select all state elements (empty selection initially)
         .data(mexicoStates.features) // Bind GeoJSON features array to selection
         .enter() // Get enter selection for new data

@@ -4,7 +4,7 @@
     // const width = 800; // Set map width in pixels
     // const height = 600; // Set map height in pixels
     const attrArray = ["AbductionRate","CrimeRate","EstPopOver18","MurderRate","SecPercep","State","adm1_code"]; // Define which CSV columns to transfer to GeoJSON properties
-    const attrLabels = { // Define useful data labels
+    const attrLabels = {
         "State": "State",
         "adm1_code": "Admin Code",
         "EstPopOver18": "Estimated Population Over 18",
@@ -92,6 +92,7 @@
         geoData.features.forEach(state => { // For each geographic feature (state/province) in the GeoJSON:
             const csvMatch = csvData.find(row => row.adm1_code === state.properties.adm1_code); // Try to find matching CSV row using admin code as key
             if (csvMatch) {
+                // Ensure State name is consistent
                 state.properties.State = csvMatch.State; 
                 attrArray.forEach(attr => {
                     state.properties[attr] = parseFloat(csvMatch[attr]) || csvMatch[attr];
@@ -105,6 +106,16 @@
     }
     
     /////////// VISUALIZATION FUNCTIONS //////////
+    // function getColorScheme() {
+    //     return [                         // Returns an array of color hex codes for choropleth
+    //         "#D4B9DA", // light purple   // Lightest color for lowest values
+    //         "#C994C7",                   // 
+    //         "#DF65B0", // medium pink    // Middle color for median values
+    //         "#DD1C77", // dark pink      // 
+    //         "#980043"  // burgundy       // Darkest color for highest values
+    //     ];
+    // }
+
     function getColorScheme() {
         return [                // Returns an array of color hex codes for choropleth
             "#edf8e9",          // Lightest color for lowest values
@@ -146,15 +157,20 @@
         return colorScale; // Return the configured scaleNow ready to use like: colorScale(42) → returns a color
     }
 
+
+
+
+
+
     /**
      * Creates coordinated bar chart synced with choropleth map
      * @param {Array} csvData - State stats matching map data
      * @param {d3.scale} colorScale - Map's color scale for consistency
      */
     function setChart(csvData, colorScale){ 
-        let currentHighlight = null;                   // Track active highlight
-        const chartWidth = window.innerWidth * 0.5,    // 42.5% width (map uses remainder)
-            chartHeight = 460;                         // Matches map height
+        let currentHighlight = null; // Track active highlight
+        const chartWidth = window.innerWidth * 0.5,  // 42.5% width (map uses remainder)
+            chartHeight = 460;                       // Matches map height
         
         let chart = d3.select("body")                  // Targets document body
             .append("svg")                             // Adds SVG as body's last child
@@ -181,17 +197,24 @@
                 }) * 1.05 // Add 5% padding
             ]);
 
-        // Create bars for each data point
         let bars = chart.selectAll(".bars")
             .data(csvData)
             .enter()
             .append("rect")
-            .sort((a,b) => b[expressed]-a[expressed]) // Sort descending
-            .attr("class", d => "bars " + d.state)    // Assign class
-            .attr("width", chartWidth/csvData.length-1) // Fixed width
-            .attr("x", (d,i) => i*(chartWidth/csvData.length)) // Position
+            .sort(function(a, b){
+                return b[expressed]-a[expressed]
+            })
+            .attr("class", function(d){
+                return "bars " + d.state;
+            })
+            .attr("width", chartWidth / csvData.length - 1)
+            .attr("x", function(d, i){
+                return i * (chartWidth / csvData.length);
+            })
+            // .attr("height", 460)
+            // .attr("y", 0);
 
-            //    SVG Coordinate System (0,0 at top-left)
+            //             SVG Coordinate System (0,0 at top-left)
             // ┌───────────────────────┐
             // │                       │ ← y=0 (top edge)
             // │    █ (y position)     │
@@ -206,65 +229,142 @@
             .attr("y", function(d){
                 return chartHeight - yScale(parseFloat(d[expressed])); // Sets the vertical starting position of each bar. Positions bars from the bottom up (SVG coordinates start at top-left).
             })
-            .style("fill", d => colorScale(d[expressed])); // Color by value
-          
-        // Bar hover interactions
-        bars.on("mouseover", function(event, d) {
-            currentHighlight = d.adm1_code;          // Track active state
-            d3.select(this)                          // Highlight bar
-                .style("stroke", "#000")
-                .style("stroke-width", "2px");
-            
-            // Highlight corresponding map state
-            const stateClass = d.adm1_code.replace(/\s+/g, "-").replace(/[^\w-]/g, "");
-            d3.select(`.state.${stateClass}`)
-                .style("stroke", "#000")
-                .style("stroke-width", "2px");
-            
-            // Add state name label to map
-            d3.select(".map").selectAll(".state-name-label").remove();
-            d3.select(".map").append("text")
-                .attr("class", "state-name-label")
-                .attr("x", "50%")
-                .attr("y", 30)
-                .attr("text-anchor", "middle")
-                .style("font-size", "16px")
-                .style("font-weight", "bold")
-                .style("fill", "#333")
-                .text(d.State);
-            
-            // Dim other bars
-            d3.selectAll(".bars").style("opacity", 0.3);
-            d3.select(this).style("opacity", 1);
-            
-        }).on("mouseout", function(event, d) {
-            if (currentHighlight === d.adm1_code) {  // Only reset if still active
-                resetHighlights();
-            }
-        });
+            .style("fill", function(d){
+                return colorScale(d[expressed]);
+            });
+            // .on("mouseover", function(event, d) {
+            //     // Highlight the hovered bar
+            //     d3.select(this)
+            //         .transition()
+            //         .duration(200)
+            //         .style("stroke", "#000")
+            //         .style("stroke-width", "2px")
+            //         .style("opacity", 1);
+                
+            //     // Highlight corresponding state on map
+            //     const stateClass = d.adm1_code;
+            //     d3.select(`.state.${stateClass}`)
+            //         .transition()
+            //         .duration(200)
+            //         .style("stroke", "#000")
+            //         .style("stroke-width", "2px");
+                
+            //     // Add state name label to map
+            //     d3.select(".map").append("text")
+            //         .attr("class", "state-name-label")
+            //         .attr("x", width/2)
+            //         .attr("y", 30)
+            //         .attr("text-anchor", "middle")
+            //         .style("font-size", "14px")
+            //         .style("font-weight", "bold")
+            //         .text(d.State);
+                
+            //     // Fade non-relevant bars
+            //     d3.selectAll(".bars")
+            //         .transition()
+            //         .duration(200)
+            //         .style("opacity", 0.3);
+                
+            //     // Keep current bar fully visible
+            //     d3.select(this)
+            //         .transition()
+            //         .style("opacity", 1);
+            // })
+            // .on("mouseout", function() {
+            //     // Reset bar styles
+            //     d3.select(this)
+            //         .transition()
+            //         .duration(200)
+            //         .style("stroke", null)
+            //         .style("stroke-width", null);
+                
+            //     // Reset all states
+            //     d3.selectAll(".state")
+            //         .transition()
+            //         .duration(200)
+            //         .style("stroke", null)
+            //         .style("stroke-width", null);
+                
+            //     // Remove state name label
+            //     d3.selectAll(".state-name-label").remove();
+                
+            //     // Restore all bars to full opacity
+            //     d3.selectAll(".bars")
+            //         .transition()
+            //         .duration(200)
+            //         .style("opacity", 1);
+            // });
         
-        function resetHighlights() {
-            // Restore default bar styles
-            d3.selectAll(".bars")
-                .style("opacity", 1)
-                .style("stroke", null)
-                .style("stroke-width", null);
+            bars.on("mouseover", function(event, d) {
+                // Clear any pending resets
+                d3.select(this).interrupt();
+                d3.selectAll(".state").interrupt();
+                
+                // Store current selection
+                currentHighlight = d.adm1_code;
+                
+                // Highlight the bar
+                d3.select(this)
+                    .style("stroke", "#000")
+                    .style("stroke-width", "2px");
+                
+                // Highlight corresponding state on map
+                const stateClass = d.adm1_code.replace(/\s+/g, "-").replace(/[^\w-]/g, "");
+                const statePath = d3.select(`.state.${stateClass}`);
+                
+                console.log("Highlighting:", stateClass, "Element:", statePath.node());
+                
+                statePath
+                    .style("stroke", "#000")
+                    .style("stroke-width", "2px");
+                
+                // Add state name to map
+                d3.select(".map").selectAll(".state-name-label").remove();
+                d3.select(".map").append("text")
+                    .attr("class", "state-name-label")
+                    .attr("x", "50%")
+                    .attr("y", 30)
+                    .attr("text-anchor", "middle")
+                    .style("font-size", "16px")
+                    .style("font-weight", "bold")
+                    .style("fill", "#333")
+                    .text(d.State);
+                
+                // Dim other bars
+                d3.selectAll(".bars")
+                    .style("opacity", 0.3);
+                d3.select(this)
+                    .style("opacity", 1);
+                
+            }).on("mouseout", function(event, d) {
+                // Only reset if this is still the current highlight
+                if (currentHighlight === d.adm1_code) {
+                    resetHighlights();
+                }
+            });
             
-            // Restore default map state styles
-            d3.selectAll(".state")
-                .style("stroke", function() {
-                    return d3.select(this).classed("original-stroke") ? 
-                        "rgba(0, 0, 0, 0.538)" : null;
-                })
-                .style("stroke-width", function() {
-                    return d3.select(this).classed("original-stroke") ? 
-                        "0.5px" : null;
-                });
-            
-            // Remove state name label
-            d3.select(".map").selectAll(".state-name-label").remove();
-            currentHighlight = null;
-        }
+            function resetHighlights() {
+                // Reset bars
+                d3.selectAll(".bars")
+                    .style("opacity", 1)
+                    .style("stroke", null)
+                    .style("stroke-width", null);
+                
+                // Reset states
+                d3.selectAll(".state")
+                    .style("stroke", function() {
+                        return d3.select(this).classed("original-stroke") ? 
+                               "rgba(0, 0, 0, 0.538)" : null;
+                    })
+                    .style("stroke-width", function() {
+                        return d3.select(this).classed("original-stroke") ? 
+                               "0.5px" : null;
+                    });
+                
+                // Remove label
+                d3.select(".map").selectAll(".state-name-label").remove();
+                currentHighlight = null;
+            }
             
             function drawStates(map, geoData, path, colorScale) {
                 map.selectAll(".state")
@@ -278,64 +378,54 @@
                     .style("stroke-width", "0.5px");
             }
 
-            // Special hover rects for zero-value bars
-        bars.filter(d => parseFloat(d[expressed]) === 0)
-        .each(function(d) {
-            const hoverRect = chart.append("rect")
-                .attr("class", "zero-hover")
-                .attr("x", d3.select(this).attr("x"))    // Match bar position
-                .attr("y", chartHeight - 20)             // Position at bottom
-                .attr("width", d3.select(this).attr("width")) // Match bar width
-                .attr("height", 20)                      // Fixed height
-                .style("opacity", 0)                     // Invisible
-                .style("pointer-events", "all")           // But interactive
-                .on("mouseover", function(event) {       // Same as bar hover
-                    const stateClass = d.adm1_code.replace(/\s+/g, "-").replace(/[^\w-]/g, "");
-                    currentHighlight = d.adm1_code;
-                    d3.select(`.state.${stateClass}`)
-                        .style("stroke", "#000")
-                        .style("stroke-width", "2px");
-                    d3.select(".map").append("text")
-                        .attr("class", "state-name-label")
-                        .attr("x", "50%")
-                        .attr("y", 30)
-                        .text(d.State);
-                })
-                .on("mouseout", function() {
-                    if (currentHighlight === d.adm1_code) {
-                        resetHighlights();
-                    }
-                });
-        });
 
-        // Add value labels above bars
         let numbers = chart.selectAll(".numbers")
             .data(csvData)
             .enter()
             .append("text")
-            .sort((a,b) => b[expressed]-a[expressed]) // Match bar order
-            .attr("class", "number-label")           // For styling
-            .attr("text-anchor", "middle")           // Center text
-            .attr("x", (d,i) => {                    // Center in bar
-                const barWidth = chartWidth / csvData.length;
-                return i * barWidth + barWidth / 2;
+            .sort(function(a, b){
+                return b[expressed]-a[expressed]
             })
-            .attr("y", d => chartHeight-yScale(parseFloat(d[expressed]))-15) // Position above bar
-            .style("font-size", "10px")              // Small text
-            .style("fill", "#333")                   // Dark color
-            .style("pointer-events", "none")         // Critical: allow hover through
-            .attr("dy", "1em")                       // Vertical adjustment
-            .text(d => d[expressed]);                // Display value
+            .attr("class", "number-label") // Simplified class
+            .attr("text-anchor", "middle")
+            .attr("x", function(d, i) {
+                const barWidth = chartWidth / csvData.length;
+                return i * barWidth + barWidth / 2; // Perfect center of bar
+            })
+            .attr("y", function(d) {
+                return chartHeight - yScale(parseFloat(d[expressed])) - 15; // 15px above bar, works for values of zero.
+            })
+            .style("font-size", "10px") // Explicit small size
+            .style("fill", "#333") // Darker color for readability
+            // .attr("transform", "rotate(-45)")
+            .attr("dy", "1em") // Adjust vertical offset
+            .text(d => d[expressed]);
             
-        // Add chart title
         let chartTitle = chart.append("text")
             .attr("text-anchor", "middle")    
             .attr("x", chartWidth / 2)
             .attr("y", 40)
             .attr("class", "chartTitle")
-            .text(attrLabels[expressed]);            // Use attribute label
+            .text(attrLabels[expressed]); // Just show the label without data values
+
+        // //create vertical axis generator
+        // var yAxis = d3.axisLeft()
+        // .scale(yScale);
+
+        // //place axis
+        // var axis = chart.append("g")
+        //     .attr("class", "axis")
+        //     .attr("transform", translate)
+        //     .call(yAxis);
             
     };
+
+
+
+
+
+
+
 
     /**
      * Renders the complete map visualization

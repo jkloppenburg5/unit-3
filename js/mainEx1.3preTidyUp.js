@@ -18,7 +18,7 @@
             .scale(1512.78) // Set projection scale factor, as per https://uwcart.github.io/d3-projection-demo/
             .translate([width / 2, height / 2]); // Center projection in SVG
         
-        var promises = [ // Array of data loading promises
+        let promises = [ // Array of data loading promises
             d3.csv("data/mxStateStats.csv"), // Load CSV data
             d3.json("data/mxStatePoly.topojson") // Load TopoJSON data
         ];
