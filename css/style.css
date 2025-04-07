@@ -107,7 +107,7 @@ g.axis {
     stroke-width: 0.5px;
     stroke-linecap: round;
     fill-opacity: 0.8;
-    transition: fill 0.3s ease, stroke-width 0.1s ease; /* Smooth color transitions */
+    transition: fill 0.2s ease, stroke-width 0.1s ease; /* Smooth color transitions */
     .state {
         outline: 1px solid red !important; /* Temporary */
     }
