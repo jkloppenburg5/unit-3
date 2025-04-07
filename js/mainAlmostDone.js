@@ -4,7 +4,7 @@
     // const width = 800; // Set map width in pixels
     // const height = 600; // Set map height in pixels
     const attrArray = ["AbductionRate","CrimeRate","EstPopOver18","MurderRate","SecPercep","State","adm1_code"]; // Define which CSV columns to transfer to GeoJSON properties
-    const attrLabels = {
+    const attrLabels = { // Define useful data labels
         "State": "State",
         "adm1_code": "Admin Code",
         "EstPopOver18": "Estimated Population Over 18",
@@ -92,7 +92,6 @@
         geoData.features.forEach(state => { // For each geographic feature (state/province) in the GeoJSON:
             const csvMatch = csvData.find(row => row.adm1_code === state.properties.adm1_code); // Try to find matching CSV row using admin code as key
             if (csvMatch) {
-                // Ensure State name is consistent
                 state.properties.State = csvMatch.State; 
                 attrArray.forEach(attr => {
                     state.properties[attr] = parseFloat(csvMatch[attr]) || csvMatch[attr];
@@ -106,16 +105,6 @@
     }
     
     /////////// VISUALIZATION FUNCTIONS //////////
-    // function getColorScheme() {
-    //     return [                         // Returns an array of color hex codes for choropleth
-    //         "#D4B9DA", // light purple   // Lightest color for lowest values
-    //         "#C994C7",                   // 
-    //         "#DF65B0", // medium pink    // Middle color for median values
-    //         "#DD1C77", // dark pink      // 
-    //         "#980043"  // burgundy       // Darkest color for highest values
-    //     ];
-    // }
-
     function getColorScheme() {
         return [                // Returns an array of color hex codes for choropleth
             "#edf8e9",          // Lightest color for lowest values
@@ -232,69 +221,7 @@
             .style("fill", function(d){
                 return colorScale(d[expressed]);
             });
-            // .on("mouseover", function(event, d) {
-            //     // Highlight the hovered bar
-            //     d3.select(this)
-            //         .transition()
-            //         .duration(200)
-            //         .style("stroke", "#000")
-            //         .style("stroke-width", "2px")
-            //         .style("opacity", 1);
-                
-            //     // Highlight corresponding state on map
-            //     const stateClass = d.adm1_code;
-            //     d3.select(`.state.${stateClass}`)
-            //         .transition()
-            //         .duration(200)
-            //         .style("stroke", "#000")
-            //         .style("stroke-width", "2px");
-                
-            //     // Add state name label to map
-            //     d3.select(".map").append("text")
-            //         .attr("class", "state-name-label")
-            //         .attr("x", width/2)
-            //         .attr("y", 30)
-            //         .attr("text-anchor", "middle")
-            //         .style("font-size", "14px")
-            //         .style("font-weight", "bold")
-            //         .text(d.State);
-                
-            //     // Fade non-relevant bars
-            //     d3.selectAll(".bars")
-            //         .transition()
-            //         .duration(200)
-            //         .style("opacity", 0.3);
-                
-            //     // Keep current bar fully visible
-            //     d3.select(this)
-            //         .transition()
-            //         .style("opacity", 1);
-            // })
-            // .on("mouseout", function() {
-            //     // Reset bar styles
-            //     d3.select(this)
-            //         .transition()
-            //         .duration(200)
-            //         .style("stroke", null)
-            //         .style("stroke-width", null);
-                
-            //     // Reset all states
-            //     d3.selectAll(".state")
-            //         .transition()
-            //         .duration(200)
-            //         .style("stroke", null)
-            //         .style("stroke-width", null);
-                
-            //     // Remove state name label
-            //     d3.selectAll(".state-name-label").remove();
-                
-            //     // Restore all bars to full opacity
-            //     d3.selectAll(".bars")
-            //         .transition()
-            //         .duration(200)
-            //         .style("opacity", 1);
-            // });
-        
+          
             bars.on("mouseover", function(event, d) {
                 // Clear any pending resets
                 d3.select(this).interrupt();

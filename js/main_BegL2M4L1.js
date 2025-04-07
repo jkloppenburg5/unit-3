@@ -1,8 +1,12 @@
 (function(){
     
     /////////// CONFIGURATION CONSTRAINTS //////////
-    const attrArray = ["AbductionRate","CrimeRate","EstPopOver18","MurderRate","SecPercep"]; // Define which CSV columns to transfer to GeoJSON properties
+    // const width = 800; // Set map width in pixels
+    // const height = 600; // Set map height in pixels
+    const attrArray = ["AbductionRate","CrimeRate","EstPopOver18","MurderRate","SecPercep","State","adm1_code"]; // Define which CSV columns to transfer to GeoJSON properties
     const attrLabels = { // Define useful data labels
+        "State": "State",
+        "adm1_code": "Admin Code",
         "EstPopOver18": "Estimated Population Over 18",
         "MurderRate": "Murder Rate (per 100k)",
         "AbductionRate": "Abduction Rate (per 100k)", 
@@ -11,10 +15,6 @@
     };
     const topojsonObjectName = "mexicoStates2"; // Name of TopoJSON object containing states
     let expressed = "AbductionRate"; // Currently visualized attribute
-    const chartWidth = window.innerWidth * 0.5;    // 42.5% width (map uses remainder)
-    const chartHeight = 460;                         // Matches map height
-    const yScale = d3.scaleLinear().range([0, chartHeight]); // Initialize with range
-    window.onload = setMap; // Execute setMap when window finishes loading
 
     ////////// MAIN MAP SETUP FUNCTION ////////// 
     function setMap() {
@@ -38,6 +38,7 @@
             .center([7.27, 21.58]) // Set projection center [longitude, latitude]
             .rotate([108.27, -2.97, 0]) // Rotate projection [x, y, z]
             .parallels([20.41, 59.94]) // Set standard (horizontal) parallels
+            // .scale(1512.78) // Set projection scale factor, as per https://uwcart.github.io/d3-projection-demo/
             .scale(1200) // Set projection scale factor, as per https://uwcart.github.io/d3-projection-demo/
             .translate([width / 2, height / 2]); // Center projection in SVG
     }
@@ -104,6 +105,23 @@
     }
     
     /////////// VISUALIZATION FUNCTIONS //////////
+    function getColorScheme() {
+        return [                // Returns an array of color hex codes for choropleth
+            "#edf8e9",          // Lightest color for lowest values
+            "#bae4b3",          // 
+            "#74c476",          // Middle color for median values
+            "#31a354",          // 
+            "#006d2c"           // Darkest color for highest values
+        ];
+    }
+    
+    /* Modern, streamlined approach
+    // function makeColorScale(data, attribute) {
+    //     return d3.scaleQuantile()        // Create a quantile scale (divides data into equal-sized bins)
+    //         .range(getColorScheme())     // Assign our color scheme to the scale's output range
+    //         .domain(data.map(d => parseFloat(d[attribute]))); // Convert CSV strings to numbers for domain   
+    // }
+    */
     function makeColorScale(data, attribute) {
         var colorClasses = [               // Array of hex color codes:
             "#edf8e9",          // Lightest color for lowest values
@@ -135,38 +153,188 @@
      */
     function setChart(csvData, colorScale){ 
         let currentHighlight = null;                   // Track active highlight
+        const chartWidth = window.innerWidth * 0.5,    // 42.5% width (map uses remainder)
+            chartHeight = 460;                         // Matches map height
         
         let chart = d3.select("body")                  // Targets document body
             .append("svg")                             // Adds SVG as body's last child
             .attr("width", chartWidth)                 // Viewport width in px
             .attr("height", chartHeight)               // Viewport height in px
             .attr("class", "chart");                   // Enables CSS/D3 selections
+
+        // let yScale = d3.scaleLinear()                  // Create the y vertical scale
+        //     .range([chartHeight, 0])                   // Output min and max, the [0,0] coordinate of the SVG is its upper-left corner.
+        //     .domain([                                  // Input min and max
+        //         0, // Minimum baseline (0 for bar charts)
+        //         d3.max(csvData, d => +d[expressed]) // Dynamic max from my data
+        //     ]);
         
-        // Configure the yScale (already declared globally)
-        yScale.domain([0, d3.max(csvData, d => {
-            const val = parseFloat(d[expressed]);
-            return isNaN(val) ? 0 : val;
-        }) * 1.05]);
+        let yScale = d3.scaleLinear() // Create the y vertical scale
+            .range([0, chartHeight])  // Output min and max, the [0,0] coordinate of the SVG is its upper-left corner.
+            .domain([  // Input min and max
+                0, // Minimum baseline (0 for bar charts)
+                d3.max(csvData, d => { // Dynamic max from my data
+                    // Safely parse the value, default to 0 if invalid
+                    const val = parseFloat(d[expressed]);
+                    console.log("Max value:", d3.max(csvData, d => parseFloat(d[expressed])));
+                    return isNaN(val) ? 0 : val;
+                }) * 1.05 // Add 5% padding
+            ]);
 
         // Create bars for each data point
-        let bars = chart.selectAll(".bar")
+        let bars = chart.selectAll(".bars")
             .data(csvData)
             .enter()
             .append("rect")
             .sort((a,b) => b[expressed]-a[expressed]) // Sort descending
-            .attr("class", d => "bar " + d.adm1_code)    // Assign class
+            .attr("class", d => "bars " + d.state)    // Assign class
             .attr("width", chartWidth/csvData.length) // Fixed width
+            .attr("x", (d,i) => i*(chartWidth/csvData.length)) // Position
 
-        // Use update function
-        updateChart(bars, csvData.length, colorScale);
+            //    SVG Coordinate System (0,0 at top-left)
+            // ┌───────────────────────┐
+            // │                       │ ← y=0 (top edge)
+            // │    █ (y position)     │
+            // │    █                  │
+            // │    █                  │ ← height (data value in pixels)
+            // │    █                  │
+            // │_______________________│ ← y=chartHeight (bottom edge)
 
+            .attr("height", function(d){ // In SVG, height is always the downward extension from the specified y-position
+                return yScale(parseFloat(d[expressed])); // Represents the data value converted to pixel height, the vertical length of each bar.
+            })
+            .attr("y", function(d){
+                return chartHeight - yScale(parseFloat(d[expressed])); // Sets the vertical starting position of each bar. Positions bars from the bottom up (SVG coordinates start at top-left).
+            })
+            .style("fill", d => colorScale(d[expressed])); // Color by value
+          
+        // Bar hover interactions
+        bars.on("mouseover", function(event, d) {
+            currentHighlight = d.adm1_code;          // Track active state
+            d3.select(this)                          // Highlight bar
+                .style("stroke", "#000")
+                .style("stroke-width", "2px");
+            
+            // Highlight corresponding map state
+            const stateClass = d.adm1_code.replace(/\s+/g, "-").replace(/[^\w-]/g, "");
+            d3.select(`.state.${stateClass}`)
+                .style("stroke", "#000")
+                .style("stroke-width", "2px");
+            
+            // Add state name label to map
+            d3.select(".map").selectAll(".state-name-label").remove();
+            d3.select(".map").append("text")
+                .attr("class", "state-name-label")
+                .attr("x", "50%")
+                .attr("y", 30)
+                .attr("text-anchor", "middle")
+                .style("font-size", "16px")
+                .style("font-weight", "bold")
+                .style("fill", "#333")
+                .text(d.State);
+            
+            // Dim other bars
+            d3.selectAll(".bars").style("opacity", 0.3);
+            d3.select(this).style("opacity", 1);
+            
+        }).on("mouseout", function(event, d) {
+            if (currentHighlight === d.adm1_code) {  // Only reset if still active
+                resetHighlights();
+            }
+        });
+        
+        function resetHighlights() {
+            // Restore default bar styles
+            d3.selectAll(".bars")
+                .style("opacity", 1)
+                .style("stroke", null)
+                .style("stroke-width", null);
+            
+            // Restore default map state styles
+            d3.selectAll(".state")
+                .style("stroke", function() {
+                    return d3.select(this).classed("original-stroke") ? 
+                        "rgba(0, 0, 0, 0.538)" : null;
+                })
+                .style("stroke-width", function() {
+                    return d3.select(this).classed("original-stroke") ? 
+                        "0.5px" : null;
+                });
+            
+            // Remove state name label
+            d3.select(".map").selectAll(".state-name-label").remove();
+            currentHighlight = null;
+        }
+            
+            function drawStates(map, geoData, path, colorScale) {
+                map.selectAll(".state")
+                    .data(geoData.features)
+                    .enter()
+                    .append("path")
+                    .attr("class", d => `state ${d.properties.adm1_code} original-stroke`)
+                    .attr("d", path)
+                    .style("fill", d => colorScale(d.properties[expressed]))
+                    .style("stroke", "rgba(0,0,0,0.538)")
+                    .style("stroke-width", "0.5px");
+            }
+
+            // Special hover rects for zero-value bars
+        bars.filter(d => parseFloat(d[expressed]) === 0)
+        .each(function(d) {
+            const hoverRect = chart.append("rect")
+                .attr("class", "zero-hover")
+                .attr("x", d3.select(this).attr("x"))    // Match bar position
+                .attr("y", chartHeight - 20)             // Position at bottom
+                .attr("width", d3.select(this).attr("width")) // Match bar width
+                .attr("height", 20)                      // Fixed height
+                .style("opacity", 0)                     // Invisible
+                .style("pointer-events", "all")           // But interactive
+                .on("mouseover", function(event) {       // Same as bar hover
+                    const stateClass = d.adm1_code.replace(/\s+/g, "-").replace(/[^\w-]/g, "");
+                    currentHighlight = d.adm1_code;
+                    d3.select(`.state.${stateClass}`)
+                        .style("stroke", "#000")
+                        .style("stroke-width", "2px");
+                    d3.select(".map").append("text")
+                        .attr("class", "state-name-label")
+                        .attr("x", "50%")
+                        .attr("y", 30)
+                        .text(d.State);
+                })
+                .on("mouseout", function() {
+                    if (currentHighlight === d.adm1_code) {
+                        resetHighlights();
+                    }
+                });
+        });
+
+        // Add value labels above bars
+        let numbers = chart.selectAll(".numbers")
+            .data(csvData)
+            .enter()
+            .append("text")
+            .sort((a,b) => b[expressed]-a[expressed]) // Match bar order
+            .attr("class", "number-label")           // For styling
+            .attr("text-anchor", "middle")           // Center text
+            .attr("x", (d,i) => {                    // Center in bar
+                const barWidth = chartWidth / csvData.length;
+                return i * barWidth + barWidth / 2;
+            })
+            .attr("y", d => chartHeight-yScale(parseFloat(d[expressed]))-15) // Position above bar
+            .style("font-size", "10px")              // Small text
+            .style("fill", "#333")                   // Dark color
+            .style("pointer-events", "none")         // Critical: allow hover through
+            .attr("dy", "1em")                       // Vertical adjustment
+            .text(d => d[expressed]);                // Display value
+            
         // Add chart title
-        chart.append("text")
+        let chartTitle = chart.append("text")
             .attr("text-anchor", "middle")    
             .attr("x", chartWidth / 2)
             .attr("y", 40)
             .attr("class", "chartTitle")
-            .text(attrLabels[expressed]);   
+            .text(attrLabels[expressed]);            // Use attribute label
+            
     };
 
     /**
@@ -181,7 +349,6 @@
         setGraticule(map, path);      // Add reference grid
         drawStates(map, geoData, path, colorScale); // Draw state polygons
         setChart(csvData, colorScale); // Create coordinated bar chart
-        createDropdown(csvData);
     }
 
     /**
@@ -230,82 +397,6 @@
             });
     }
     
-    //function to create a dropdown menu for attribute selection
-    function createDropdown(csvData){
-        // Adding an element to the DOM for the menu
-        let dropdown = d3.select("body") // Creating a variable called Dropdown to hold Select element
-            .append("select") // Add a Select element to the Body
-            .attr("class", "dropdown") // Assigna class for CSS
-            .on("change", function(){ // Listen for a "change" interaction on the <select> element
-                changeAttribute(this.value, csvData) // Parameters: value of the <select> element (referenced by this) which holds the attribute selected by the user, and csvData
-            });
-
-        //Add initial menu option
-        let titleOption = dropdown.append("option") // Block creates an <option> element with no value attribute 
-            .attr("class", "titleOption")                   // Assign a class for CSS
-            .attr("disabled", "true")                       // Disable it from being accidentially selected
-            .text("Select Attribute");                      // Instructional text to serve as an affordance alerting users that they should interact with the dropdown menu 
-
-        // Add attribute name options to dropdown menu
-        let attrOptions = dropdown.selectAll("attrOptions") // Select all potential option elements (initially empty)
-            .data(attrArray)                                // Bind the array of attribute names to the selection
-            .enter()                                       // Get the enter selection (data without elements)
-            .append("option")                              // Append an <option> element for each new data point
-            .attr("value", function(d){ return d })        // Set the option's value attribute to the attribute name
-            .text(function(d){ return attrLabels[d] || d;  // Use the friendly label if available, fallback to raw name});  
-            });
-    };
-
-    function changeAttribute(attribute, csvData) { 
-        // Update the global variable storing the currently expressed attribute
-        expressed = attribute;  // This will be used by other functions to know which data to display
-    
-        // Recreate the color scale with the new attribute's data range
-        const colorScale = makeColorScale(csvData, expressed);  // Generates a new scale based on the selected attribute's values
-    
-        // Update y-scale domain for new attribute
-        yScale.domain([0, d3.max(csvData, d => {const val = parseFloat(d[expressed]);return isNaN(val) ? 0 : val;}) * 1.05]);
-    
-        // Recolor all geographic regions on the map
-        d3.selectAll(".state")
-            .style("fill", function (d) {
-                const value = d.properties[expressed];
-                return value ? colorScale(value) : "#ccc";
-        });
-
-        // Update chart
-        const bars = d3.selectAll(".bar")
-            .sort((a, b) => b[expressed] - a[expressed]);
-
-        updateChart(bars, csvData.length, colorScale);
-
-        // Update chart title
-        d3.select(".chartTitle").text(attrLabels[expressed]);
-    };
-
-    function updateChart(bars, numBars, colorScale) {
-        //    SVG Coordinate System (0,0 at top-left)
-        // ┌───────────────────────┐
-        // │                       │ ← y=0 (top edge)
-        // │    █ (y position)     │
-        // │    █                  │
-        // │    █                  │ ← height (data value in pixels)
-        // │    █                  │
-        // │_______________________│ ← y=chartHeight (bottom edge)
-
-        // Position bars based on new sort order
-        bars.attr("x", (d, i) => i * (chartWidth / numBars))
-            // Resize bars
-            .attr("height", d => yScale(parseFloat(d[expressed])))
-            // Reposition bars vertically
-            .attr("y", d => chartHeight - yScale(parseFloat(d[expressed])))
-            // Recolor bars
-            .style("fill", d => {
-                const value = d[expressed];
-                return value ? colorScale(value) : "#ccc";
-            });
-    }
-    
     function handleError(error) {
         console.error("Error loading data:", error);
         d3.select("body").append("div")
@@ -313,4 +404,5 @@
             .text("Failed to load data. Check console for details.");
     }
 
+       window.onload = setMap; // Execute setMap when window finishes loading
 })();

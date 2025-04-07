@@ -1,15 +1,21 @@
 /*Add CSS styles here*/
-.axis path,
+
+.axis path, 
 .axis line {
     fill: none;
-    stroke: black;
-    stroke-width: 1px;
+    stroke: #86868685;
     shape-rendering: crispEdges;
 }
 
 .axis text {
     font-family: sans-serif;
-    font-size: 0.9em;
+    font-size: 11px;
+    fill: #7d7d7d; /* Solid color instead of transparency */
+    stroke: none;   /* Remove any text outline */
+}
+
+g.axis {
+    color: #7d7d7d; /* Fallback, matches the text color */
 }
 
 .title {
@@ -36,21 +42,27 @@
     margin: 10px 20px 0 0;
 }
 
+/* Add this to your styles */
+.chart rect {
+    shape-rendering: crispEdges;
+    vector-effect: non-scaling-stroke;
+}
+
 .numbers {
     fill: white;
     font-family: sans-serif;
 }
 
 /* Add to your styles */
-.bars {
+.bar {
     transition: all 0.2s ease;
     cursor: pointer;
     stroke: rgba(0, 0, 0, 0.538);
-    stroke-width: 0.5px;
+    stroke-width: 1.5px;
     opacity: 1;
 }
 
-.bars:hover {
+.bar:hover {
     opacity: 0.8;
 }
 
@@ -60,6 +72,11 @@
     fill: #333;
     pointer-events: none;
 }
+
+.zero-hover {
+    cursor: pointer;
+}
+
 
 /* Temporary debug borders
 .viz-container { border: 1px dashed red; }
@@ -107,6 +124,30 @@
     stroke: rgba(0, 0, 0, 0.538);
     stroke-width: 0.5px;
     stroke-linecap: round;
+}
+
+.dropdown {
+    position: absolute;
+    top: 30px;
+    left: 40px;
+    z-index: 10;
+    font-family: sans-serif;
+    font-size: 1em;
+    font-weight: bold;
+    padding: 2px;
+    border: 1px solid #999;
+    box-shadow: 2px 2px 4px #999;
+}
+
+option {
+    font-weight: normal;
+}
+
+.chartTitle {
+    font-family: sans-serif;
+    font-size: 16px;
+    font-weight: bold;
+    fill: #333;
 }
 
 

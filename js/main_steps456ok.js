@@ -11,10 +11,10 @@
     };
     const topojsonObjectName = "mexicoStates2"; // Name of TopoJSON object containing states
     let expressed = "AbductionRate"; // Currently visualized attribute
+    
     const chartWidth = window.innerWidth * 0.5;    // 42.5% width (map uses remainder)
     const chartHeight = 460;                         // Matches map height
     const yScale = d3.scaleLinear().range([0, chartHeight]); // Initialize with range
-    window.onload = setMap; // Execute setMap when window finishes loading
 
     ////////// MAIN MAP SETUP FUNCTION ////////// 
     function setMap() {
@@ -135,6 +135,8 @@
      */
     function setChart(csvData, colorScale){ 
         let currentHighlight = null;                   // Track active highlight
+        // const chartWidth = window.innerWidth * 0.5,    // 42.5% width (map uses remainder)
+        //     chartHeight = 460;                         // Matches map height
         
         let chart = d3.select("body")                  // Targets document body
             .append("svg")                             // Adds SVG as body's last child
@@ -148,6 +150,18 @@
             return isNaN(val) ? 0 : val;
         }) * 1.05]);
 
+        // let yScale = d3.scaleLinear() // Create the y vertical scale
+        //     .range([0, chartHeight])  // Output min and max, the [0,0] coordinate of the SVG is its upper-left corner.
+        //     .domain([  // Input min and max
+        //         0, // Minimum baseline (0 for bar charts)
+        //         d3.max(csvData, d => { // Dynamic max from my data
+        //             // Safely parse the value, default to 0 if invalid
+        //             const val = parseFloat(d[expressed]);
+        //             console.log("Max value:", d3.max(csvData, d => parseFloat(d[expressed])));
+        //             return isNaN(val) ? 0 : val;
+        //         }) * 1.05 // Add 5% padding
+        // ]);
+
         // Create bars for each data point
         let bars = chart.selectAll(".bar")
             .data(csvData)
@@ -156,17 +170,32 @@
             .sort((a,b) => b[expressed]-a[expressed]) // Sort descending
             .attr("class", d => "bar " + d.adm1_code)    // Assign class
             .attr("width", chartWidth/csvData.length) // Fixed width
+            .attr("x", (d,i) => i*(chartWidth/csvData.length)) // Position
 
-        // Use update function
-        updateChart(bars, csvData.length, colorScale);
+            //    SVG Coordinate System (0,0 at top-left)
+            // ┌───────────────────────┐
+            // │                       │ ← y=0 (top edge)
+            // │    █ (y position)     │
+            // │    █                  │
+            // │    █                  │ ← height (data value in pixels)
+            // │    █                  │
+            // │_______________________│ ← y=chartHeight (bottom edge)
 
+            .attr("height", function(d){ // In SVG, height is always the downward extension from the specified y-position
+                return yScale(parseFloat(d[expressed])); // Represents the data value converted to pixel height, the vertical length of each bar.
+            })
+            .attr("y", function(d){
+                return chartHeight - yScale(parseFloat(d[expressed])); // Sets the vertical starting position of each bar. Positions bars from the bottom up (SVG coordinates start at top-left).
+            })
+            .style("fill", d => colorScale(d[expressed])); // Color by value
+                    
         // Add chart title
-        chart.append("text")
+        let chartTitle = chart.append("text")
             .attr("text-anchor", "middle")    
             .attr("x", chartWidth / 2)
             .attr("y", 40)
             .attr("class", "chartTitle")
-            .text(attrLabels[expressed]);   
+            .text(attrLabels[expressed]);            // Use attribute label   
     };
 
     /**
@@ -265,7 +294,14 @@
     
         // Update y-scale domain for new attribute
         yScale.domain([0, d3.max(csvData, d => {const val = parseFloat(d[expressed]);return isNaN(val) ? 0 : val;}) * 1.05]);
-    
+        
+        // Recolor all geographic regions on the map
+        // var states = d3.selectAll(".state")  // Select all map regions (SVG paths with class 'state')
+        //     .style("fill", function (d) {       // Update each state's fill color
+        //         var value = d.properties[expressed];  // Get the current attribute value for this state
+        //         return value ? colorScale(value) : "#ccc";
+        // });
+
         // Recolor all geographic regions on the map
         d3.selectAll(".state")
             .style("fill", function (d) {
@@ -273,39 +309,32 @@
                 return value ? colorScale(value) : "#ccc";
         });
 
-        // Update chart
-        const bars = d3.selectAll(".bar")
-            .sort((a, b) => b[expressed] - a[expressed]);
+        // ADD SOMETHING HERE TO UPDATE THE BAR CHART BASED ON THE ATTRIBUTE SELECTED BY THE USER TO ACHIEVE an interactive choropleth map and linked chart visualization
+        // Update the bars
+        // var bars = d3.selectAll(".bar")
+        //     // Sort bars by new attribute
+        //     .sort((a, b) => b[expressed] - a[expressed])
+        //     // Update x positions based on new sort order
+        //     .attr("x", (d, i) => i * (chartWidth / csvData.length))
+        //     // Update heights based on new attribute values
+        //     .attr("height", d => yScale(parseFloat(d[expressed])))
+        //     // Update y positions
+        //     .attr("y", d => chartHeight - yScale(parseFloat(d[expressed])))
+        //     // Recolor bars
+        //     .style("fill", d => colorScale(d[expressed]));
 
-        updateChart(bars, csvData.length, colorScale);
+            // Update the bars
+        d3.selectAll(".bar")
+            .sort((a, b) => b[expressed] - a[expressed])
+            .attr("x", (d, i) => i * (chartWidth / csvData.length))
+            .attr("height", d => yScale(parseFloat(d[expressed])))
+            .attr("y", d => chartHeight - yScale(parseFloat(d[expressed])))
+            .style("fill", d => colorScale(d[expressed]));
 
         // Update chart title
         d3.select(".chartTitle").text(attrLabels[expressed]);
     };
 
-    function updateChart(bars, numBars, colorScale) {
-        //    SVG Coordinate System (0,0 at top-left)
-        // ┌───────────────────────┐
-        // │                       │ ← y=0 (top edge)
-        // │    █ (y position)     │
-        // │    █                  │
-        // │    █                  │ ← height (data value in pixels)
-        // │    █                  │
-        // │_______________________│ ← y=chartHeight (bottom edge)
-
-        // Position bars based on new sort order
-        bars.attr("x", (d, i) => i * (chartWidth / numBars))
-            // Resize bars
-            .attr("height", d => yScale(parseFloat(d[expressed])))
-            // Reposition bars vertically
-            .attr("y", d => chartHeight - yScale(parseFloat(d[expressed])))
-            // Recolor bars
-            .style("fill", d => {
-                const value = d[expressed];
-                return value ? colorScale(value) : "#ccc";
-            });
-    }
-    
     function handleError(error) {
         console.error("Error loading data:", error);
         d3.select("body").append("div")
@@ -313,4 +342,5 @@
             .text("Failed to load data. Check console for details.");
     }
 
+    window.onload = setMap; // Execute setMap when window finishes loading
 })();

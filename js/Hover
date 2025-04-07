@@ -1,0 +1,110 @@
+        // Create bars for each data point
+        // let bars = chart.selectAll(".bars")
+        // .data(csvData)
+        
+        // Bar hover interactions
+        bars.on("mouseover", function(event, d) {
+            currentHighlight = d.adm1_code;          // Track active state
+            d3.select(this)                          // Highlight bar
+                .style("stroke", "#000")
+                .style("stroke-width", "2px");
+            
+            // Highlight corresponding map state
+            const stateClass = d.adm1_code.replace(/\s+/g, "-").replace(/[^\w-]/g, "");
+            d3.select(`.state.${stateClass}`)
+                .style("stroke", "#000")
+                .style("stroke-width", "2px");
+            
+            // Add state name label to map
+            d3.select(".map").selectAll(".state-name-label").remove();
+            d3.select(".map").append("text")
+                .attr("class", "state-name-label")
+                .attr("x", "50%")
+                .attr("y", 30)
+                .attr("text-anchor", "middle")
+                .style("font-size", "16px")
+                .style("font-weight", "bold")
+                .style("fill", "#333")
+                .text(d.State);
+            
+            // Dim other bars
+            d3.selectAll(".bars").style("opacity", 0.3);
+            d3.select(this).style("opacity", 1);
+            
+        }).on("mouseout", function(event, d) {
+            if (currentHighlight === d.adm1_code) {  // Only reset if still active
+                resetHighlights();
+            }
+        });
+        
+        function resetHighlights() {
+            // Restore default bar styles
+            d3.selectAll(".bars")
+                .style("opacity", 1)
+                .style("stroke", null)
+                .style("stroke-width", null);
+            
+            // Restore default map state styles
+            d3.selectAll(".state")
+                .style("stroke", function() {
+                    return d3.select(this).classed("original-stroke") ? 
+                        "rgba(0, 0, 0, 0.538)" : null;
+                })
+                .style("stroke-width", function() {
+                    return d3.select(this).classed("original-stroke") ? 
+                        "0.5px" : null;
+                });
+            
+            // Remove state name label
+            d3.select(".map").selectAll(".state-name-label").remove();
+            currentHighlight = null;
+        }
+            
+        // Special hover rects for zero-value bars
+        bars.filter(d => parseFloat(d[expressed]) === 0)
+        .each(function(d) {
+            const hoverRect = chart.append("rect")
+                .attr("class", "zero-hover")
+                .attr("x", d3.select(this).attr("x"))    // Match bar position
+                .attr("y", chartHeight - 20)             // Position at bottom
+                .attr("width", d3.select(this).attr("width")) // Match bar width
+                .attr("height", 20)                      // Fixed height
+                .style("opacity", 0)                     // Invisible
+                .style("pointer-events", "all")           // But interactive
+                .on("mouseover", function(event) {       // Same as bar hover
+                    const stateClass = d.adm1_code.replace(/\s+/g, "-").replace(/[^\w-]/g, "");
+                    currentHighlight = d.adm1_code;
+                    d3.select(`.state.${stateClass}`)
+                        .style("stroke", "#000")
+                        .style("stroke-width", "2px");
+                    d3.select(".map").append("text")
+                        .attr("class", "state-name-label")
+                        .attr("x", "50%")
+                        .attr("y", 30)
+                        .text(d.State);
+                })
+                .on("mouseout", function() {
+                    if (currentHighlight === d.adm1_code) {
+                        resetHighlights();
+                    }
+                });
+        });
+
+        // Add value labels above bars
+        let numbers = chart.selectAll(".numbers")
+            .data(csvData)
+            .enter()
+            .append("text")
+            .sort((a,b) => b[expressed]-a[expressed]) // Match bar order
+            .attr("class", "number-label")           // For styling
+            .attr("text-anchor", "middle")           // Center text
+            .attr("x", (d,i) => {                    // Center in bar
+                const barWidth = chartWidth / csvData.length;
+                return i * barWidth + barWidth / 2;
+            })
+            .attr("y", d => chartHeight-yScale(parseFloat(d[expressed]))-15) // Position above bar
+            .style("font-size", "10px")              // Small text
+            .style("fill", "#333")                   // Dark color
+            .style("pointer-events", "none")         // Critical: allow hover through
+            .attr("dy", "1em")                       // Vertical adjustment
+            .text(d => d[expressed]);                // Display value
