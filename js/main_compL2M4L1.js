@@ -13,8 +13,7 @@
     let expressed = "AbductionRate"; // Currently visualized attribute
     const chartWidth = window.innerWidth * 0.5;    // 42.5% width (map uses remainder)
     const chartHeight = 460;                         // Matches map height
-    const leftMargin = 25; // Just adding left margin
-    const yScale = d3.scaleLinear().range([chartHeight,0]); // Initialize with range
+    const yScale = d3.scaleLinear().range([0, chartHeight]); // Initialize with range
     window.onload = setMap; // Execute setMap when window finishes loading
 
     ////////// MAIN MAP SETUP FUNCTION ////////// 
@@ -149,12 +148,6 @@
             return isNaN(val) ? 0 : val;
         }) * 1.05]);
 
-        // Add y-axis to left side
-        chart.append("g")
-            .attr("class", "y-axis")
-            .attr("transform", `translate(${leftMargin},0)`)
-            .call(d3.axisLeft(yScale));
-
         // Create bars for each data point
         let bars = chart.selectAll(".bar")
             .data(csvData)
@@ -162,7 +155,7 @@
             .append("rect")
             .sort((a,b) => b[expressed]-a[expressed]) // Sort descending
             .attr("class", d => "bar " + d.adm1_code)    // Assign class
-            .attr("width", (chartWidth - leftMargin) / csvData.length - 1);
+            .attr("width", chartWidth/csvData.length) // Fixed width
 
         // Use update function
         updateChart(bars, csvData.length, colorScale);
@@ -170,7 +163,7 @@
         // Add chart title
         chart.append("text")
             .attr("text-anchor", "middle")    
-            .attr("x", leftMargin + (chartWidth - leftMargin) / 2)
+            .attr("x", chartWidth / 2)
             .attr("y", 40)
             .attr("class", "chartTitle")
             .text(attrLabels[expressed]);   
@@ -301,28 +294,16 @@
         // │_______________________│ ← y=chartHeight (bottom edge)
 
         // Position bars based on new sort order
-        // bars.attr("x", (d, i) => i * (chartWidth / numBars))
-        //     // Resize bars
-        //     .attr("height", d => yScale(parseFloat(d[expressed])))
-        //     // Reposition bars vertically
-        //     .attr("y", d => chartHeight - yScale(parseFloat(d[expressed])))
-        //     // Recolor bars
-        //     .style("fill", d => {
-        //         const value = d[expressed];
-        //         return value ? colorScale(value) : "#ccc";
-        //     });
-        
-        // Update bars (positioned with left margin)
-        bars.attr("x", (d, i) => i * ((chartWidth - leftMargin) / numBars) + leftMargin)
-            // Height from bottom minus scaled position
-            .attr("height", d => chartHeight - yScale(parseFloat(d[expressed])))
-            // Position from top using scaled value
-            .attr("y", d => yScale(parseFloat(d[expressed])))
-            .style("fill", d => colorScale(d[expressed]));
-        
-        // Update y-axis
-        d3.select(".y-axis").call(d3.axisLeft(yScale));
-
+        bars.attr("x", (d, i) => i * (chartWidth / numBars))
+            // Resize bars
+            .attr("height", d => yScale(parseFloat(d[expressed])))
+            // Reposition bars vertically
+            .attr("y", d => chartHeight - yScale(parseFloat(d[expressed])))
+            // Recolor bars
+            .style("fill", d => {
+                const value = d[expressed];
+                return value ? colorScale(value) : "#ccc";
+            });
     }
     
     function handleError(error) {
