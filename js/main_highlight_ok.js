@@ -15,51 +15,6 @@
     const chartHeight = 460;                         // Matches map height
     const leftMargin = 25; // Just adding left margin
     const yScale = d3.scaleLinear().range([chartHeight,0]); // Initialize with range
-    
-    /////////// LABEL FUNCTIONS //////////
-    
-    function positionLabel(event) {
-        const label = d3.select(".infolabel");  /* Select existing label */
-        if (label.empty()) return;  /* Exit if no label exists */
-        
-        const padding = 10;  /* Padding around label */
-        const labelWidth = label.node().getBoundingClientRect().width;  /* Get label width */
-        const labelHeight = label.node().getBoundingClientRect().height;  /* Get label height */
-        
-        let x = event.clientX + padding;  /* Default x position (right of cursor) */
-        let y = event.clientY - labelHeight - padding;  /* Default y position (above cursor) */
-        
-        if (x + labelWidth > window.innerWidth) {  /* If label would overflow right edge */
-            x = event.clientX - labelWidth - padding;  /* Position left of cursor */
-        }
-        if (y < padding) {  /* If label would overflow top edge */
-            y = event.clientY + padding;  /* Position below cursor */
-        }
-        
-        label
-            .style("left", x + "px")  /* Set final x position */
-            .style("top", y + "px");  /* Set final y position */
-    }
-    
-    function setLabel(props, event) {
-        d3.select(".infolabel").remove();  // Remove any existing label
-        
-        const labelContent = `
-            <div class="label-title">${props.State}</div>
-            <div class="label-value">${props[expressed]}</div>
-            <div class="label-attribute">${attrLabels[expressed]}</div>
-        `;
-        
-        const label = d3.select("body")  // Append new label to body
-            .append("div")
-            .attr("class", "infolabel")  // Set class for styling
-            .html(labelContent);  // Insert HTML content
-        
-        if (event) {  // If event object provided
-            positionLabel(event);  // Position the label
-        }
-    }
-
     window.onload = setMap; // Execute setMap when window finishes loading
 
     ////////// MAIN MAP SETUP FUNCTION ////////// 
@@ -188,120 +143,119 @@
             .attr("height", chartHeight)               // Viewport height in px
             .attr("class", "chart");                   // Enables CSS/D3 selections
         
-        /* Configure the yScale (already declared globally) */
+        // Configure the yScale (already declared globally)
         yScale.domain([0, d3.max(csvData, d => {
             const val = parseFloat(d[expressed]);
-            return isNaN(val) ? 0 : val;  /* Handle NaN values by returning 0 */
-        }) * 1.05]);  /* Add 5% padding to max value */
+            return isNaN(val) ? 0 : val;
+        }) * 1.05]);
 
-        /* Add y-axis to left side */
+        // Add y-axis to left side
         chart.append("g")
-            .attr("class", "y-axis")  /* Class for styling */
-            .attr("transform", `translate(${leftMargin},0)`)  /* Position within margins */
-            .call(d3.axisLeft(yScale));  /* Create left-oriented axis */
+            .attr("class", "y-axis")
+            .attr("transform", `translate(${leftMargin},0)`)
+            .call(d3.axisLeft(yScale));
 
-        /* Create bars for each data point */
+        // Create bars for each data point
         let bars = chart.selectAll(".bar")
-            .data(csvData)  /* Bind data */
-            .enter()  /* Enter selection */
-            .append("rect")  /* Create rectangle for each data point */
-            .sort((a,b) => b[expressed]-a[expressed])  /* Sort bars by expressed value */
-            .attr("class", d => `bar ${d.adm1_code.replace(/\s+/g, "-")}`)  /* Dynamic class with sanitized code */
-            .attr("width", (chartWidth - leftMargin) / csvData.length - 1)  /* Calculate bar width */
-            .style("opacity", d => parseFloat(d[expressed]) === 0 ? 0 : 1) /* Hide zero-value bars */
-            .on("mouseover", function(event, d) {
-                currentHighlight = d.adm1_code;  /* Track currently highlighted element */
-                
-                /* Highlight elements */
-                d3.select(this)  /* Current bar */
-                    .style("stroke", "#000")  /* Black border */
-                    .style("stroke-width", "2px");  /* 2px border width */
-                
-                d3.select(`.state.${d.adm1_code.replace(/\s+/g, "-")}`)  /* Corresponding map element */
-                    .style("stroke", "#000")  /* Black border */
-                    .style("stroke-width", "2px");  /* 2px border width */
-                
-                /* Show label */
-                setLabel({
-                    ...d,  /* Spread all properties */
-                    name: d.State,  /* Ensure name property exists */
-                    [expressed]: d[expressed]  /* Include current attribute value */
-                }, event);  /* Pass mouse event for positioning */
-                
-                /* Dim other bars */
-                d3.selectAll(".bar").style("opacity", function(d) {
-                    return parseFloat(d[expressed]) === 0 ? 0 : 0.3;  /* 30% opacity for others */
-                });
-                d3.select(this).style("opacity", 1);  /* Full opacity for current bar */
-            })
-            .on("mousemove", function(event) {
-                positionLabel(event);  /* Update label position with mouse */
-            })
-            .on("mouseout", function(event, d) {
-                if (currentHighlight === d.adm1_code) {  /* Only reset if still highlighting same element */
-                    resetHighlights();  /* Clear highlights */
-                }
-            });
+            .data(csvData)
+            .enter()
+            .append("rect")
+            .sort((a,b) => b[expressed]-a[expressed]) // Sort descending
+            .attr("class", d => "bar " + d.adm1_code)    // Assign class
+            .attr("width", (chartWidth - leftMargin) / csvData.length - 1);
+            // .on("mouseover",function(event, d){
+            //     highlight(d); // Because in the CSV, the adm1_code is at the root level, not in root/properties like the GeoJSON
+            // });
 
+        // Bar hover interactions
+        bars.on("mouseover", function(event, d) {
+            currentHighlight = d.adm1_code;          // Track active state
+            d3.select(this)                          // Highlight bar
+                .style("stroke", "#000")
+                .style("stroke-width", "2px");
+            
+            // Highlight corresponding map state
+            const stateClass = d.adm1_code.replace(/\s+/g, "-").replace(/[^\w-]/g, "");
+            d3.select(`.state.${stateClass}`)
+                .style("stroke", "#000")
+                .style("stroke-width", "2px");
+            
+            // Add state name label to map
+            d3.select(".map").selectAll(".state-name-label").remove();
+            d3.select(".map").append("text")
+                .attr("class", "state-name-label")
+                .attr("x", "50%")
+                .attr("y", 30)
+                .attr("text-anchor", "middle")
+                .style("font-size", "16px")
+                .style("font-weight", "bold")
+                .style("fill", "#333")
+                .text(d.State);
+            
+            // Dim other bars
+            d3.selectAll(".bar").style("opacity", 0.3);
+            d3.select(this).style("opacity", 1);
+            
+        }).on("mouseout", function(event, d) {
+            if (currentHighlight === d.adm1_code) {  // Only reset if still active
+                resetHighlights();
+            }
+        });
+        
         function resetHighlights() {
-            /* Reset bars */
+            // Restore default bar styles
             d3.selectAll(".bar")
-                .style("opacity", d => parseFloat(d[expressed]) === 0 ? 0 : 1)  /* Restore original opacity */
-                .style("stroke", null)  /* Remove border */
-                .style("stroke-width", null);  /* Remove border width */
+                .style("opacity", 1)
+                .style("stroke", null)
+                .style("stroke-width", null);
             
-            /* Reset states */
-            d3.selectAll(".state")  /* All map elements */
-                .style("stroke", null)  /* Remove border */
-                .style("stroke-width", null);  /* Remove border width */
+            // Restore default map state styles
+            d3.selectAll(".state")
+                .style("stroke", function() {
+                    return d3.select(this).classed("original-stroke") ? 
+                        "rgba(0, 0, 0, 0.538)" : null;
+                })
+                .style("stroke-width", function() {
+                    return d3.select(this).classed("original-stroke") ? 
+                        "0.5px" : null;
+                });
             
-            /* Remove all labels */
-            d3.select(".infolabel").remove();  /* Remove data label */
-            d3.select(".state-name-label").remove();  /* Remove state name label */
-            currentHighlight = null;  /* Clear highlight tracking */
+            // Remove state name label
+            d3.select(".map").selectAll(".state-name-label").remove();
+            currentHighlight = null;
         }
             
-        // // Special hover rects for zero-value bars
-        // bars.filter(d => parseFloat(d[expressed]) === 0)
-        // .each(function(d) {
-        //     const hoverRect = chart.append("rect")
-        //         .attr("class", "zero-hover")
-        //         .attr("x", d3.select(this).attr("x"))    // Match bar position
-        //         .attr("y", chartHeight - 20)             // Position at bottom
-        //         .attr("width", d3.select(this).attr("width")) // Match bar width
-        //         .attr("height", 20)                      // Fixed height
-        //         .style("opacity", 0)                     // Invisible
-        //         .style("pointer-events", "all")           // But interactive
-        //         .on("mouseover", function(event) {       // Same as bar hover
-        //             const stateClass = d.adm1_code.replace(/\s+/g, "-").replace(/[^\w-]/g, "");
-        //             currentHighlight = d.adm1_code;
-        //             d3.select(`.state.${stateClass}`)
-        //                 .style("stroke", "#000")
-        //                 .style("stroke-width", "2px");
-                    
-        //             // Add dynamic label for zero-value bars (NEW)
-        //             setLabel({
-        //                 ...d,
-        //                 name: d.State,
-        //                 [expressed]: d[expressed]
-        //             });
-                            
-        //             d3.select(".map").append("text")
-        //                 .attr("class", "state-name-label")
-        //                 .attr("x", "50%")
-        //                 .attr("y", 30)
-        //                 .text(d.State);
-        //         })
-        //         .on("mousemove", moveLabel) 
-        //         .on("mouseout", function() {
-        //             if (currentHighlight === d.adm1_code) {
-        //                 resetHighlights();
-        //             }
-        //         });
-        // });
+        // Special hover rects for zero-value bars
+        bars.filter(d => parseFloat(d[expressed]) === 0)
+        .each(function(d) {
+            const hoverRect = chart.append("rect")
+                .attr("class", "zero-hover")
+                .attr("x", d3.select(this).attr("x"))    // Match bar position
+                .attr("y", chartHeight - 20)             // Position at bottom
+                .attr("width", d3.select(this).attr("width")) // Match bar width
+                .attr("height", 20)                      // Fixed height
+                .style("opacity", 0)                     // Invisible
+                .style("pointer-events", "all")           // But interactive
+                .on("mouseover", function(event) {       // Same as bar hover
+                    const stateClass = d.adm1_code.replace(/\s+/g, "-").replace(/[^\w-]/g, "");
+                    currentHighlight = d.adm1_code;
+                    d3.select(`.state.${stateClass}`)
+                        .style("stroke", "#000")
+                        .style("stroke-width", "2px");
+                    d3.select(".map").append("text")
+                        .attr("class", "state-name-label")
+                        .attr("x", "50%")
+                        .attr("y", 30)
+                        .text(d.State);
+                })
+                .on("mouseout", function() {
+                    if (currentHighlight === d.adm1_code) {
+                        resetHighlights();
+                    }
+                });
+        });
     
         // Use update function
-        
         updateChart(bars, csvData.length, colorScale);
 
         // Add chart title
@@ -371,22 +325,10 @@
             .style("fill", d => {     // Apply choropleth coloring:
                 const value = d.properties[expressed]; // Get current attribute value
                 return value ? colorScale(value) : "#ccc"; // Use color scale or default gray
-            })
-            .on("mouseover", function(event, d) {
-                d3.select(this)
-                    .style("stroke", "#000")
-                    .style("stroke-width", "2px");
-                setLabel(d.properties, event);
-            })
-            .on("mousemove", function(event) {
-                positionLabel(event); // Changed from moveLabel to positionLabel
-            })
-            .on("mouseout", function() {
-                d3.select(this)
-                    .style("stroke", null)
-                    .style("stroke-width", null);
-                d3.select(".infolabel").remove();
             });
+            // .on("mouseover",function(event, d){
+            //     highlight(d.properties);
+            // });
     }
     
     //function to create a dropdown menu for attribute selection
@@ -451,6 +393,18 @@
         // │    █                  │ ← height (data value in pixels)
         // │    █                  │
         // │_______________________│ ← y=chartHeight (bottom edge)
+
+        // Position bars based on new sort order
+        // bars.attr("x", (d, i) => i * (chartWidth / numBars))
+        //     // Resize bars
+        //     .attr("height", d => yScale(parseFloat(d[expressed])))
+        //     // Reposition bars vertically
+        //     .attr("y", d => chartHeight - yScale(parseFloat(d[expressed])))
+        //     // Recolor bars
+        //     .style("fill", d => {
+        //         const value = d[expressed];
+        //         return value ? colorScale(value) : "#ccc";
+        //     });
         
         // Update bars (positioned with left margin)
         bars.attr("x", (d, i) => i * ((chartWidth - leftMargin) / numBars) + leftMargin)
@@ -464,7 +418,34 @@
         d3.select(".y-axis").call(d3.axisLeft(yScale));
 
     }
-   
+
+    // //function to highlight enumeration units and bars
+    // function highlight(props){ //props is the properties object of the selected element from the GeoJSON data or the attributes object from the CSV data
+    //     //change stroke
+    //     var selected = d3.selectAll("." + props.adm1_code) // Props.adm1_code is dynamically inserted (e.g., if adm1_code = "MEX-01", the selector becomes ".MEX-01").  Combined, it selects all elements with the class MEX-01.
+    //         .style("stroke", "blue")
+    //         .style("stroke-width", "2");
+    // };
+
+    // function highlight(props) {
+    //     // Ensure props exists and has adm1_code
+    //     if (!props || !props.adm1_code) {
+    //         console.warn("Invalid properties object:", props);
+    //         return;
+    //     }
+        
+        // // Reset all highlights first
+        // d3.selectAll(".state, .bar")
+        //     .style("stroke", null)
+        //     .style("stroke-width", null);
+    
+    //     // Apply highlight to matching elements
+    //     const selector = "." + props.adm1_code.replace(/\s+/g, "-").replace(/[^\w-]/g, "");
+    //     d3.selectAll(selector)
+    //         .style("stroke", "blue")
+    //         .style("stroke-width", "2");
+    // }
+    
     function handleError(error) {
         console.error("Error loading data:", error);
         d3.select("body").append("div")
