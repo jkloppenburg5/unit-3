@@ -163,98 +163,7 @@
             .sort((a,b) => b[expressed]-a[expressed]) // Sort descending
             .attr("class", d => "bar " + d.adm1_code)    // Assign class
             .attr("width", (chartWidth - leftMargin) / csvData.length - 1);
-            // .on("mouseover",function(event, d){
-            //     highlight(d); // Because in the CSV, the adm1_code is at the root level, not in root/properties like the GeoJSON
-            // });
 
-        // Bar hover interactions
-        bars.on("mouseover", function(event, d) {
-            currentHighlight = d.adm1_code;          // Track active state
-            d3.select(this)                          // Highlight bar
-                .style("stroke", "#000")
-                .style("stroke-width", "2px");
-            
-            // Highlight corresponding map state
-            const stateClass = d.adm1_code.replace(/\s+/g, "-").replace(/[^\w-]/g, "");
-            d3.select(`.state.${stateClass}`)
-                .style("stroke", "#000")
-                .style("stroke-width", "2px");
-            
-            // Add state name label to map
-            d3.select(".map").selectAll(".state-name-label").remove();
-            d3.select(".map").append("text")
-                .attr("class", "state-name-label")
-                .attr("x", "50%")
-                .attr("y", 30)
-                .attr("text-anchor", "middle")
-                .style("font-size", "16px")
-                .style("font-weight", "bold")
-                .style("fill", "#333")
-                .text(d.State);
-            
-            // Dim other bars
-            d3.selectAll(".bar").style("opacity", 0.3);
-            d3.select(this).style("opacity", 1);
-            
-        }).on("mouseout", function(event, d) {
-            if (currentHighlight === d.adm1_code) {  // Only reset if still active
-                resetHighlights();
-            }
-        });
-        
-        function resetHighlights() {
-            // Restore default bar styles
-            d3.selectAll(".bar")
-                .style("opacity", 1)
-                .style("stroke", null)
-                .style("stroke-width", null);
-            
-            // Restore default map state styles
-            d3.selectAll(".state")
-                .style("stroke", function() {
-                    return d3.select(this).classed("original-stroke") ? 
-                        "rgba(0, 0, 0, 0.538)" : null;
-                })
-                .style("stroke-width", function() {
-                    return d3.select(this).classed("original-stroke") ? 
-                        "0.5px" : null;
-                });
-            
-            // Remove state name label
-            d3.select(".map").selectAll(".state-name-label").remove();
-            currentHighlight = null;
-        }
-            
-        // Special hover rects for zero-value bars
-        bars.filter(d => parseFloat(d[expressed]) === 0)
-        .each(function(d) {
-            const hoverRect = chart.append("rect")
-                .attr("class", "zero-hover")
-                .attr("x", d3.select(this).attr("x"))    // Match bar position
-                .attr("y", chartHeight - 20)             // Position at bottom
-                .attr("width", d3.select(this).attr("width")) // Match bar width
-                .attr("height", 20)                      // Fixed height
-                .style("opacity", 0)                     // Invisible
-                .style("pointer-events", "all")           // But interactive
-                .on("mouseover", function(event) {       // Same as bar hover
-                    const stateClass = d.adm1_code.replace(/\s+/g, "-").replace(/[^\w-]/g, "");
-                    currentHighlight = d.adm1_code;
-                    d3.select(`.state.${stateClass}`)
-                        .style("stroke", "#000")
-                        .style("stroke-width", "2px");
-                    d3.select(".map").append("text")
-                        .attr("class", "state-name-label")
-                        .attr("x", "50%")
-                        .attr("y", 30)
-                        .text(d.State);
-                })
-                .on("mouseout", function() {
-                    if (currentHighlight === d.adm1_code) {
-                        resetHighlights();
-                    }
-                });
-        });
-    
         // Use update function
         updateChart(bars, csvData.length, colorScale);
 
@@ -326,9 +235,6 @@
                 const value = d.properties[expressed]; // Get current attribute value
                 return value ? colorScale(value) : "#ccc"; // Use color scale or default gray
             });
-            // .on("mouseover",function(event, d){
-            //     highlight(d.properties);
-            // });
     }
     
     //function to create a dropdown menu for attribute selection
@@ -418,33 +324,6 @@
         d3.select(".y-axis").call(d3.axisLeft(yScale));
 
     }
-
-    // //function to highlight enumeration units and bars
-    // function highlight(props){ //props is the properties object of the selected element from the GeoJSON data or the attributes object from the CSV data
-    //     //change stroke
-    //     var selected = d3.selectAll("." + props.adm1_code) // Props.adm1_code is dynamically inserted (e.g., if adm1_code = "MEX-01", the selector becomes ".MEX-01").  Combined, it selects all elements with the class MEX-01.
-    //         .style("stroke", "blue")
-    //         .style("stroke-width", "2");
-    // };
-
-    // function highlight(props) {
-    //     // Ensure props exists and has adm1_code
-    //     if (!props || !props.adm1_code) {
-    //         console.warn("Invalid properties object:", props);
-    //         return;
-    //     }
-        
-        // // Reset all highlights first
-        // d3.selectAll(".state, .bar")
-        //     .style("stroke", null)
-        //     .style("stroke-width", null);
-    
-    //     // Apply highlight to matching elements
-    //     const selector = "." + props.adm1_code.replace(/\s+/g, "-").replace(/[^\w-]/g, "");
-    //     d3.selectAll(selector)
-    //         .style("stroke", "blue")
-    //         .style("stroke-width", "2");
-    // }
     
     function handleError(error) {
         console.error("Error loading data:", error);
